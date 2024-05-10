@@ -1,0 +1,233 @@
+<!-- Modify it at your will. -->
+
+
+<group name="remote,syslog,synology">
+<!-- ################################### Connection ################################-->
+
+<!--These rules do not log the "access" status due to the extreme amount of logs it could generate, if you wish you may log them by removing the <options> line. Keep in mind that whenever ANY user accesses ANY root-level folders, the log will be recorded. -->
+
+    <rule id="110000" level="2">
+        <decoded_as>synology-connection</decoded_as>
+        <program_name>Connection</program_name>
+        <status>access</status>
+        <description>[$(hostname)]: Synology DSM user folder access.</description>
+        <options>no_log</options>
+        <mitre>
+            <id>T1083</id>
+        </mitre>
+    </rule>    
+
+<!-- Log: Standard logins via web or ssh -->
+    <rule id="110001" level="5">
+        <decoded_as>synology-connection</decoded_as>
+        <program_name>Connection</program_name>
+        <status>fail</status>
+        <description>[$(hostname)]: Synology DSM user login failed.</description>
+        <mitre>
+            <id>T1110.001</id>
+        </mitre>
+    </rule>
+    
+    <rule id="110002" level="3">
+        <decoded_as>synology-connection</decoded_as>
+        <program_name>Connection</program_name>
+        <status>success</status>
+        <description>[$(hostname)]: Synology DSM user login success.</description>
+        <mitre>
+            <id>T1078</id>
+            <id>T1078.003</id>
+        </mitre>
+    </rule>
+    
+    <rule id="110003" level="3">
+        <decoded_as>synology-connection</decoded_as>
+        <program_name>Connection</program_name>
+        <field name="mfa_request">2FA</field>
+        <status>success</status>
+        <description>[$(hostname)]: Synology DSM user login 2FA Success.</description>
+        <mitre>
+            <id>T1078</id>
+            <id>T1078.003</id>
+            <id>T1621</id>
+        </mitre>
+    </rule>
+
+    <rule id="110004" level="3">
+        <decoded_as>synology-connection</decoded_as>
+        <program_name>Connection</program_name>
+        <protocol>SSH</protocol>
+        <status>success</status>
+        <description>[$(hostname)]: Synology DSM succesful user login via SSH.</description>
+        <mitre>
+            <id>T1078</id>
+            <id>T1078.003</id>
+        </mitre>
+    </rule>    
+
+<!-- Alerts based on logins -->
+
+    <rule id="110005" level="10" frequency="6" timeframe="120">
+        <if_matched_sid>110001</if_matched_sid>
+        <decoded_as>synology-connection</decoded_as>
+        <program_name>Connection</program_name>
+        <status>fail</status>
+        <same_srcip/>
+        <description>[$(hostname)]: Synology brute force attack recipient via the same IP: $(srcip).</description>
+        <mitre>
+            <id>T1110</id>
+        </mitre>
+    </rule>  
+    
+    <rule id="110006" level="10" frequency="6" timeframe="120">
+        <if_matched_sid>110001</if_matched_sid>
+        <decoded_as>synology-connection</decoded_as>
+        <program_name>Connection</program_name>
+        <status>fail</status>
+        <same_srcuser/>
+        <description>[$(hostname)]: Synology brute force attack recipient via the same user: $(srcuser).</description>
+        <mitre>
+            <id>T1110</id>
+        </mitre>
+    </rule>
+
+<!-- OPTIONAL: Access related, directory enumeration based on multiple acceses within 5 seconds -->
+    <rule id="110008" level="10" frequency="10" timeframe="5">
+        <if_matched_sid>110000</if_matched_sid>
+        <decoded_as>synology-connection</decoded_as>
+        <program_name>Connection</program_name>
+        <status>access</status>
+        <same_srcip/>
+        <description>[$(hostname)]: Possible directory enumeration from the same srcip [$(srcip)]. (10 root-level folders accessed within 5 seconds)</description>
+        <mitre>
+            <id>T1083</id>
+        </mitre>
+    </rule>
+
+
+<!-- ################################### WinSysLog ################################--> 
+
+    <rule id="110101" level="2">
+        <decoded_as>synology-winfileservice</decoded_as>
+        <description>[$(hostname)]: Synology DSM shared file has been $(action)d.</description>
+        <mitre>
+            <id>T1565</id>
+            <id>T1485</id>
+        </mitre>
+    </rule>
+    
+	<!-- Frequency defines how many times an individual action must be done for this rule to trigger. Currently it's set at 1000 actions within 60 seconds, you may need to change it depending on your environment.-->
+    <rule id="110102" level="10" frequency="1000" timeframe="60">
+        <if_matched_sid>110101</if_matched_sid>
+        <decoded_as>synology-winfileservice</decoded_as>
+        <action negate="yes">read</action>
+        <same_srcuser/>
+        <description>[$(hostname)]: Multiple files or folders (1000) have been affected by the action: [$(action)] by the same srcuser [$(srcuser)] within one minute.</description>
+        <mitre>
+            <id>T1565</id>
+            <id>T1485</id>
+        </mitre>
+    </rule>
+    
+<!-- ################################### Backups ################################--> 
+
+    <rule id="110201" level="10">
+        <decoded_as>synology-backup</decoded_as>
+        <status>Fail|fail|partial|skip|cancel</status>
+        <description>[$(hostname)]: Synology Backup has not completed. Status: $(status).</description>
+        <mitre>
+            <id>T1490</id>
+            <id>T1565</id>
+            <id>T1485</id>
+        </mitre>
+    </rule>
+    
+    <rule id="110202" level="12">
+        <decoded_as>synology-backup</decoded_as>
+        <status>removed</status>
+        <description>[$(hostname)]: Synology Backup Task [$(backup_task)] has been removed.</description>
+        <mitre>
+            <id>T1490</id>
+            <id>T1565</id>
+            <id>T1485</id>
+        </mitre>
+    </rule>
+
+<!--Alerts based on failed or removed backup tasks-->
+    <rule id="110203" level="13" frequency="3" timeframe="120">
+        <if_matched_sid>110201</if_matched_sid>
+        <decoded_as>synology-backup</decoded_as>
+        <same_status/>
+        <description>[$(hostname)]: Several Synology backups have failed, cancelled or skipped.</description>
+        <mitre>
+            <id>T1490</id>
+            <id>T1565</id>
+            <id>T1485</id>
+            <id>T1561</id>
+            <id>T1565</id>
+        </mitre>
+    </rule>
+    
+    <rule id="110204" level="13" frequency="5" timeframe="120">
+        <if_matched_sid>110202</if_matched_sid>
+        <decoded_as>synology-backup</decoded_as>
+        <same_status/>
+        <description>[$(hostname)]: Several Synology backups tasks have been removed.</description>
+        <mitre>
+            <id>T1490</id>
+            <id>T1565</id>
+            <id>T1485</id>
+            <id>T1561</id>
+            <id>T1565</id>
+        </mitre>
+    </rule>
+
+
+    <!---Time-Based-Rules -->
+    <!-- NOTE: Time is based off the Wazuh server's own time, not the log time itself
+	You can add exclusions via <user negate="yes">negated_user</user> 
+	Change the time based on what your preferences are -->
+	
+    <rule id="110301" level="12">
+        <decoded_as>synology-connection</decoded_as>
+        <program_name>Connection</program_name>
+        <weekday>weekdays</weekday>
+        <status>access</status>
+        <time>8:00 pm - 6:30 am</time>
+        <description>[$(hostname)]: Shared Folder access outside business hours during the work week by [$(srcuser)] from [$(srcip)].</description>
+        <mitre>
+            <id>T1485</id>
+        </mitre>
+    </rule>
+    
+    <!-- During weekends-->
+    <rule id="110302" level="12">
+        <decoded_as>synology-connection</decoded_as>
+        <program_name>Connection</program_name>
+        <weekday>weekends</weekday>
+        <status>access</status>
+        <time>4 pm - 10:00 am</time>
+        <description>[$(hostname)]: Shared Folder access outside business hours during weekends by [$(srcuser)] from [$(srcip)].</description>
+        <mitre>
+            <id>T1485</id>
+        </mitre>
+    </rule>
+    
+    
+    
+   <!-- OPTIONAL EXAMPLE: This rule will trigger when someone accesses a certain forder on a weekend, you may change it depending on your environment -->
+   <!--
+   <rule id="110099" level="12">
+        <decoded_as>synology-connection</decoded_as>
+        <program_name>Connection</program_name>
+        <field name="foldername">SecretFolder</field>
+        <weekday>weekends</weekday>
+        <status>access</status>
+        <description>Someone accessed [$(foldername)] on a weekend.</description>
+        <mitre>
+            <id>T1485</id>
+        </mitre>
+    </rule>
+    -->
+    
+
+</group>

@@ -1,0 +1,179 @@
+<!-- Modify it at your will. -->
+
+<!--
+  - Allowed static fields:
+  - location   - where the log came from (only on FTS)
+  - srcuser    - extracts the source username
+  - dstuser    - extracts the destination (target) username
+  - user       - an alias to dstuser (only one of the two can be used)
+  - srcip      - source ip
+  - dstip      - dst ip
+  - srcport    - source port
+  - dstport    - destination port
+  - protocol   - protocol
+  - id         - event id
+  - url        - url of the event
+  - action     - event action (deny, drop, accept, etc)
+  - status     - event status (success, failure, etc)
+  - extra_data - Any extra data
+-->
+
+<!--
+Connection Logtest:
+Access:
+Apr 19 14:14:01 FILESERVER Connection: User [DOMAIN\john.doe] from [HostNameOrIP(10.20.30.40)] via [CIFS(SMB3)] accessed shared folder [FolderName].
+Login:
+Apr 19 14:13:02 FILESERVER Connection: User [some.admin] from [10.20.30.40] failed to sign in to [DSM] via [password] due to authorization failure.
+Apr 19 14:13:13 FILESERVER Connection: User [some.admin] from [10.20.30.40] has successfully passed the first authentication of 2FA via [password]
+Apr 19 14:13:20 FILESERVER Connection: User [some.admin] from [10.20.30.40] signed in to [DSM] successfully via [password].
+Apr 16 12:11:07 FILESERVER Connection: User [some.admin] from [10.20.30.40] logged in successfully via [SSH].
+-->
+
+<decoder name="synology-connection">
+    <program_name>Connection</program_name>
+</decoder>
+
+<!-- User and Source IP -->
+<decoder name="synology-connection">
+  <parent>synology-connection</parent>
+  <regex type="pcre2">User \[(\S+)] from \[.*?\(?(\d+\.\d+\.\d+\.\d+)\)?]</regex>
+  <order>srcuser,srcip</order>
+</decoder>
+
+<!-- Accessed System -->
+<!-- Sucessfully is an optional parameter, hence the ?-->
+<decoder name="synology-connection">
+  <parent>synology-connection</parent>
+  <regex type="pcre2">to \[(.+)] successfully? via</regex>
+  <order>system_name</order>
+</decoder>
+
+
+<!-- Protocol Type -->
+<decoder name="synology-connection">
+  <parent>synology-connection</parent>
+  <regex type="pcre2">via \[(\S+)]</regex>
+  <order>protocol</order>
+</decoder>
+
+<!-- Accessed Folder -->
+<decoder name="synology-connection">
+  <parent>synology-connection</parent>
+  <regex type="pcre2">accessed shared folder \[(.+)]</regex>
+  <order>foldername</order>
+</decoder>
+
+<!-- Triggered 2FA -->
+<decoder name="synology-connection">
+  <parent>synology-connection</parent>
+  <regex type="pcre2">(2FA)</regex>
+  <order>mfa_request</order>
+</decoder>
+
+<!-- Connection statuses -->
+<decoder name="synology-connection">
+  <parent>synology-connection</parent>
+  <regex>(success)</regex>
+  <order>status</order>
+</decoder>
+
+<decoder name="synology-connection">
+  <parent>synology-connection</parent>
+  <regex>(fail)</regex>
+  <order>status</order>
+</decoder>
+
+<decoder name="synology-connection">
+  <parent>synology-connection</parent>
+  <regex>(access)</regex>
+  <order>status</order>
+</decoder>
+
+
+<!--
+WinFileService Event Logtest:
+From my testing, Synology does NOT generate upload, download or move (uses rename) logs... for some reason...
+Folder:
+Apr 19 14:14:25 FILESERVER WinFileService Event: rename, Path: /FolderRoot/SubFolder/FolderNamePrevious -> /FolderRoot/SubFolder/FolderNameNew, File/Folder: Folder, Size: NA, User: DOMAIN\jane.doe, IP: 10.20.30.40
+Apr 19 14:15:22 FILESERVER WinFileService Event: delete, Path: /FolderRoot/SubFolder/FolderNameNew, File/Folder: Folder, Size: NA, User: DOMAIN\jane.doe, IP: 10.20.30.40
+File:
+Apr 22 11:58:53 FILESERVER WinFileService Event: rename, Path: /FolderRoot/SubFolder/myFile.txt -> /FolderRoot/SubFolder/FolderNameNew/myRenamedFile.txt, File/Folder: File, Size: 9.81 KB, User: DOMAIN\jane.doe, IP: 10.20.30.40
+Apr 22 11:59:11 FILESERVER WinFileService Event: delete, Path: /FolderRoot/SubFolder/myRenamedFile.txt, File/Folder: File, Size: 9.81 KB, User: DOMAIN\jane.doe, IP: 10.20.30.40
+-->
+<decoder name="synology-winfileservice">
+    <prematch>WinFileService Event:</prematch>
+</decoder>
+
+<decoder name="synology-winfileservice">
+  <parent>synology-winfileservice</parent>
+  <regex type="pcre2">Event: (\S+), Path: (.+), File\/Folder: (.+?), Size: (\S+)\s?(\w*)?, User: (\S+), IP: (\d+\.\d+\.\d+\.\d+)</regex>
+  <order>action,event_path,dst_type,size_qty,size_unit,srcuser,srcip</order>
+</decoder>
+
+
+<!--
+Credits to https://github.com/Tomo-9925/wazuh-synology-dsm-decoder-and-rules/ for the Backup logs
+Backup:
+Apr 12 15:04:05 FILESERVER Backup SYSTEM:#011[Network][TaskName] Backup task finished successfully. [227439 files scanned] [62 new files] [227377 files unchanged]
+Apr 22 15:04:05 FILESERVER Backup SYSTEM:#011[Network][TaskName] Failed to run backup task.
+Apr 21 15:04:05 FILESERVER Backup SYSTEM:#011[Network][TaskName] Backup task was cancelled.
+Apr 25 15:04:05 FILESERVER Backup SYSTEM:#011[Network][TaskName] Backup task was partially completed.
+Apr 27 15:04:05 FILESERVER Backup SYSTEM: Scheduled backup has been skipped because it collides an undergoing backup task. please re-arrange the backup schedule to avoid collisions.
+Apr 23 15:04:05 FILESERVER Backup SYSTEM: Backup task [TaskName] was removed.
+-->
+
+<decoder name="synology-backup">
+  <prematch>Backup SYSTEM:</prematch>
+</decoder>
+
+<decoder name="synology-backup">
+  <parent>synology-backup</parent>
+  <regex type="pcre2">\[(.+)]\[(.+?)]</regex>
+  <order>backup_path, backup_task</order>
+</decoder>
+
+<decoder name="synology-backup">
+  <parent>synology-backup</parent>
+  <regex type="pcre2">Backup task \[(.+?)]</regex>
+  <order>backup_task</order>
+</decoder>
+
+<!-- Task Statuses -->
+<decoder name="synology-backup">
+  <parent>synology-backup</parent>
+  <regex type="pcre2">(success)</regex>
+  <order>status</order>
+</decoder>
+
+<!-- Failed can be at the beginning of the log, becoming uppercase. This expression works around it. -->
+<decoder name="synology-backup">
+  <parent>synology-backup</parent>
+  <regex type="pcre2">(f?F?ail)</regex>
+  <order>status</order>
+</decoder>
+
+<decoder name="synology-backup">
+  <parent>synology-backup</parent>
+  <regex type="pcre2">(cancel)</regex>
+  <order>status</order>
+</decoder>
+
+<decoder name="synology-backup">
+  <parent>synology-backup</parent>
+  <regex type="pcre2">(partial)</regex>
+  <order>status</order>
+</decoder>
+
+<decoder name="synology-backup">
+  <parent>synology-backup</parent>
+  <regex type="pcre2">(skipped)</regex>
+  <order>status</order>
+</decoder>
+
+<decoder name="synology-backup">
+  <parent>synology-backup</parent>
+  <regex type="pcre2">(removed)</regex>
+  <order>status</order>
+</decoder>
+
+
