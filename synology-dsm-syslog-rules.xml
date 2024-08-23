@@ -212,7 +212,29 @@
         </mitre>
     </rule>
     
+     <!-- ################################### Webdav ################################--> 
+
+    <rule id="110401" level="2">
+        <decoded_as>synology-webdavservice</decoded_as>
+        <description>[$(hostname)]: Synology DSM WEBDAV shared file has been $(action)d.</description>
+        <mitre>
+            <id>T1565</id>
+            <id>T1485</id>
+        </mitre>
+    </rule>
     
+	<!-- Frequency defines how many times an individual action must be done for this rule to trigger. Currently it's set at 1000 actions within 60 seconds, you may need to change it depending on your environment.-->
+    <rule id="110402" level="10" frequency="50" timeframe="60">
+        <if_matched_sid>110401</if_matched_sid>
+        <decoded_as>synology-webdavservice</decoded_as>
+        <action negate="yes">read</action>
+        <same_srcuser/>
+        <description>[$(hostname)]: Multiple files or folders (50) have been affected by the action: [$(action)] by the same srcuser [$(srcuser)] within one minute.</description>
+        <mitre>
+            <id>T1565</id>
+            <id>T1485</id>
+        </mitre>
+    </rule>
     
    <!-- OPTIONAL EXAMPLE: This rule will trigger when someone accesses a certain forder on a weekend, you may change it depending on your environment -->
    <!--
