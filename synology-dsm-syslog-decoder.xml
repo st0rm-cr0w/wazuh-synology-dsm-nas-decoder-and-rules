@@ -112,6 +112,27 @@ Apr 22 11:59:11 FILESERVER WinFileService Event: delete, Path: /FolderRoot/SubFo
 
 
 <!--
+webdav example : 
+Aug 23 14:34:12 FILESERVER Webdav Event: upload, Path: /FolderRoot/SubFolder/FolderNameNew, File/Folder: File, Size: 14.17 KB, User: TEMP_MIGRATE, IP: 10.10.10.10\n
+Aug 23 14:34:12 FILESERVER Webdav Event: upload, Path: /FolderRoot/SubFolder/FolderNameNew, File/Folder: File, Size: 15.98 KB, User: TEMP_MIGRATE, IP: 10.10.10.10\n
+Aug 23 14:34:12 FILESERVER Webdav Event: upload, Path: /FolderRoot/SubFolder/FolderNameNew, File/Folder: File, Size: 18.50 KB, User: TEMP_MIGRATE, IP: 10.10.10.10\n
+Aug 23 14:34:13 FILESERVER Webdav Event: upload, Path: /FolderRoot/SubFolder/FolderNameNew, File/Folder: File, Size: 32.30 KB, User: TEMP_MIGRATE, IP: 10.10.10.10\n
+Aug 23 14:34:13 FILESERVER Webdav Event: upload, Path: /FolderRoot/SubFolder/FolderNameNew, File/Folder: File, Size: 21.44 KB, User: TEMP_MIGRATE, IP: 10.10.10.10\n
+Aug 23 14:34:13 FILESERVER Webdav Event: upload, Path: /FolderRoot/SubFolder/FolderNameNew, File/Folder: File, Size: 9.58 KB, User: TEMP_MIGRATE, IP: 10.10.10.10\n
+Aug 23 14:34:13 FILESERVER Webdav Event: upload, Path: /FolderRoot/SubFolder/FolderNameNew, File/Folder: File, Size: 17.95 KB, User: TEMP_MIGRATE, IP: 10.10.10.10\n
+-->
+
+<decoder name="synology-webdavservice">
+    <prematch>Webdav Event:</prematch>
+</decoder>
+
+<decoder name="synology-webdavservice">
+  <parent>synology-webdavservice</parent>
+  <regex type="pcre2">Event: (\S+), Path: (.+), File\/Folder: (.+?), Size: (\S+)\s?(\w*)?, User: (\S+), IP: (\d+\.\d+\.\d+\.\d+)</regex>
+  <order>action,event_path,dst_type,size_qty,size_unit,srcuser,srcip</order>
+</decoder>
+
+<!--
 Credits to https://github.com/Tomo-9925/wazuh-synology-dsm-decoder-and-rules/ for the Backup logs
 Backup:
 Apr 12 15:04:05 FILESERVER Backup SYSTEM:#011[Network][TaskName] Backup task finished successfully. [227439 files scanned] [62 new files] [227377 files unchanged]
@@ -175,5 +196,3 @@ Apr 23 15:04:05 FILESERVER Backup SYSTEM: Backup task [TaskName] was removed.
   <regex type="pcre2">(removed)</regex>
   <order>status</order>
 </decoder>
-
-
